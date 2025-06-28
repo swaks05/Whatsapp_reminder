@@ -4,21 +4,35 @@
     <title>WhatsApp Reminder Bot</title>
   </head>
   <body>
-    <h1>Set a WhatsApp Reminder</h1>
+    <h1>📲 WhatsApp Reminder Bot (IST)</h1>
     <form method="POST">
-      <label>Message:</label><br />
+      <label>Reminder Message:</label><br />
       <input type="text" name="message" required /><br /><br />
 
-      <label>Date & Time:</label><br />
-      <input type="datetime-local" name="datetime" required /><br /><br />
+      <label>Date (DD-MM-YYYY):</label><br />
+      <input
+        type="text"
+        name="date"
+        placeholder="28-06-2025"
+        required
+      /><br /><br />
+
+      <label>Time (24hr format, HH:MM):</label><br />
+      <input type="text" name="time" placeholder="21:00" required /><br /><br />
 
       <button type="submit">Set Reminder</button>
     </form>
 
-    <h2>Upcoming Reminders:</h2>
+    {% if msg %}
+    <p><b>{{ msg }}</b></p>
+    {% endif %}
+
+    <h2>🗂️ Upcoming Reminders:</h2>
     <ul>
       {% for r in reminders %}
-      <li>{{ r[1] }} at {{ r[2] }}</li>
+      <li>{{ r['message'] }} → UTC: {{ r['datetime_utc'] }}</li>
+      {% else %}
+      <li>No reminders set.</li>
       {% endfor %}
     </ul>
   </body>

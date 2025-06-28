@@ -1,51 +1,51 @@
 import os
-import sqlite3
+import threading
 import time
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 from twilio.rest import Client
-from dotenv import load_dotenv
 
-load_dotenv()  # Safe locally, ignored on Render if env vars are set there
-
-# Database Path
-DB = os.getenv('DB_PATH', 'reminders.db')
-
-# Twilio Credentials from Render Environment Variables
+# Load Env Vars (Render handles them automatically)
 account_sid = os.environ['TWILIO_SID']
 auth_token = os.environ['TWILIO_AUTH_TOKEN']
+twilio_whatsapp = os.environ['TWILIO_SANDBOX_NUMBER']
 my_whatsapp = os.environ['MY_WHATSAPP']
 
 client = Client(account_sid, auth_token)
 
+reminders_file = 'reminders.json'
+
+# Load existing reminders
+if not os.path.exists(reminders_file):
+    with open(reminders_file, 'w') as f:
+        json.dump([], f)
+
+with open(reminders_file, 'r') as f:
+    reminders = json.load(f)
+
+# Save reminders persistently
+def save_reminders():
+    with open(reminders_file, 'w') as f:
+        json.dump(reminders, f, indent=2)
+
+# WhatsApp Message Sender
+def send_whatsapp(message):
+    client.messages.create(
+        from_=twilio_whatsapp,
+        body=message,
+        to=my_whatsapp
+    )
+    print(f'✅ WhatsApp Sent: {message}')
+
+# Background Loop
 def reminder_bot():
     print("📅 Reminder Bot Loop Started...")
-    
     while True:
-        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M')
-        print(f"🔄 Server UTC Time: {now}")
-
-        with sqlite3.connect(DB) as conn:
-            reminders = conn.execute("SELECT id, message, datetime FROM reminders").fetchall()
-
-        for rid, msg, dt in reminders:
-            print(f"⏳ Checking Reminder ID {rid}: {dt} (Now: {now})")
-            if dt == now:
-                print(f"📨 Sending WhatsApp Reminder: {msg}")
-                
-                try:
-                    client.messages.create(
-                        body=msg,
-                        from_='whatsapp:+14155238886',  # Twilio Sandbox Number
-                        to=my_whatsapp
-                    )
-                    print(f"✅ Message Sent to {my_whatsapp}")
-
-                    with sqlite3.connect(DB) as conn:
-                        conn.execute("DELETE FROM reminders WHERE id = ?", (rid,))
-                        conn.commit()
-                        print(f"🗑️ Reminder ID {rid} deleted after sending")
-
-                except Exception as e:
-                    print(f"⚠️ Failed to send message: {e}")
-
-        time.sleep(30)
+        now = datetime.utcnow().replace(second=0, microsecond=0).isoformat()
+        for reminder in reminders[:]:
+            if reminder['datetime_utc'] == now:
+                send_whatsapp(f"⏰ Reminder: {reminder['message']}")
+                reminders.remove(reminder)
+                save_reminders()
+        print(f'🔄 Server UTC Time: {now}')
+        time.sleep(60)

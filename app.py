@@ -1,48 +1,40 @@
-from flask import Flask, render_template, request, redirect
-import sqlite3
-import threading
 import os
-from bot import reminder_bot
-from dotenv import load_dotenv
-
-load_dotenv()
+from flask import Flask, request, render_template, redirect
+from datetime import datetime, timedelta
+import threading
+import json
+from bot import reminder_bot, reminders, save_reminders
 
 app = Flask(__name__)
 
-# Database Path
-DB = os.getenv('DB_PATH', 'reminders.db')
-
-def init_db():
-    with sqlite3.connect(DB) as conn:
-        conn.execute('''CREATE TABLE IF NOT EXISTS reminders
-                        (id INTEGER PRIMARY KEY, message TEXT, datetime TEXT)''')
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    msg = ""
     if request.method == 'POST':
-        msg = request.form['message']
-        datetime_str = request.form['datetime']
-        
-        print(f"📝 Adding Reminder: {msg} at {datetime_str}")
+        message = request.form['message']
+        date = request.form['date']
+        time_str = request.form['time']
 
-        with sqlite3.connect(DB) as conn:
-            conn.execute("INSERT INTO reminders (message, datetime) VALUES (?, ?)", (msg, datetime_str))
-            conn.commit()
+        try:
+            # Parse IST Date & Time to UTC
+            ist_datetime = datetime.strptime(f"{date} {time_str}", "%d-%m-%Y %H:%M")
+            utc_datetime = ist_datetime - timedelta(hours=5, minutes=30)
+            utc_datetime_str = utc_datetime.replace(second=0, microsecond=0).isoformat()
 
-        return redirect('/')
+            reminders.append({
+                'message': message,
+                'datetime_utc': utc_datetime_str
+            })
+            save_reminders()
+            msg = f"✅ Reminder set for {date} {time_str} IST"
 
-    with sqlite3.connect(DB) as conn:
-        reminders = conn.execute("SELECT id, message, datetime FROM reminders ORDER BY datetime").fetchall()
+        except Exception as e:
+            msg = f"❌ Error: {e}"
 
-    return render_template('index.html', reminders=reminders)
+    return render_template('index.html', msg=msg, reminders=reminders)
 
 if __name__ == "__main__":
-    init_db()
-
-    bot_thread = threading.Thread(target=reminder_bot, daemon=True)
-    bot_thread.start()
-
-    print("✅ Bot Thread Started, Launching Web Server...")
-
+    threading.Thread(target=reminder_bot, daemon=True).start()
     port = int(os.environ.get('PORT', 5000))
+    print("✅ Bot Thread Started, Launching Web Server...")
     app.run(host="0.0.0.0", port=port)
