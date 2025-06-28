@@ -1,15 +1,18 @@
-from dotenv import load_dotenv
-load_dotenv()
 from flask import Flask, render_template, request, redirect
 import sqlite3
 import threading
 import os
-from bot import reminder_bot  # Import your existing bot logic
+from bot import reminder_bot
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env locally, safe for Render (Render vars override this)
 
 app = Flask(__name__)
-DB = 'reminders.db'
 
-# Setup DB
+# Use absolute path for Render disk or fallback to project folder
+DB = os.getenv('DB_PATH', 'reminders.db')
+
+# Ensure DB exists
 def init_db():
     with sqlite3.connect(DB) as conn:
         conn.execute('''CREATE TABLE IF NOT EXISTS reminders
@@ -19,7 +22,7 @@ def init_db():
 def index():
     if request.method == 'POST':
         msg = request.form['message']
-        datetime_str = request.form['datetime']  # Format: YYYY-MM-DDTHH:MM
+        datetime_str = request.form['datetime']
 
         with sqlite3.connect(DB) as conn:
             conn.execute("INSERT INTO reminders (message, datetime) VALUES (?, ?)", (msg, datetime_str))
@@ -35,10 +38,10 @@ def index():
 if __name__ == "__main__":
     init_db()
 
-    # Start the bot in a background thread
-    bot_thread = threading.Thread(target=reminder_bot)
-    bot_thread.daemon = True
+    # Start Reminder Bot in Background Thread
+    bot_thread = threading.Thread(target=reminder_bot, daemon=True)
     bot_thread.start()
 
-    # Start the Flask app
+    print("✅ Bot Thread Started, Launching Web Server...")
+
     app.run(host='0.0.0.0', port=5000)
