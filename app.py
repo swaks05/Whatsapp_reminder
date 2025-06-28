@@ -1,9 +1,12 @@
+from dotenv import load_dotenv
+load_dotenv()
 from flask import Flask, render_template, request, redirect
 import sqlite3
+import threading
 import os
+from bot import reminder_bot  # Import your existing bot logic
 
 app = Flask(__name__)
-
 DB = 'reminders.db'
 
 # Setup DB
@@ -31,4 +34,11 @@ def index():
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+
+    # Start the bot in a background thread
+    bot_thread = threading.Thread(target=reminder_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+
+    # Start the Flask app
+    app.run(host='0.0.0.0', port=5000)

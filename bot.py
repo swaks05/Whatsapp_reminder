@@ -6,15 +6,10 @@ import sqlite3
 from twilio.rest import Client
 import os
 
-account_sid = os.environ['TWILIO_SID']
-auth_token = os.environ['TWILIO_AUTH_TOKEN']
 twilio_whatsapp_number = 'whatsapp:+14155238886'
-my_whatsapp_number = os.environ['MY_WHATSAPP']
 DB = 'reminders.db'
 
-client = Client(account_sid, auth_token)
-
-def send_whatsapp_message(msg):
+def send_whatsapp_message(msg, client, my_whatsapp_number):
     message = client.messages.create(
         body=msg,
         from_=twilio_whatsapp_number,
@@ -24,6 +19,13 @@ def send_whatsapp_message(msg):
 
 def reminder_bot():
     print("📅 Reminder Bot Running...")
+
+    account_sid = os.environ['TWILIO_SID']
+    auth_token = os.environ['TWILIO_AUTH_TOKEN']
+    my_whatsapp_number = os.environ['MY_WHATSAPP']
+
+    client = Client(account_sid, auth_token)
+
     while True:
         now = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
 
@@ -32,12 +34,9 @@ def reminder_bot():
             due_reminders = cursor.fetchall()
 
             for reminder in due_reminders:
-                send_whatsapp_message(reminder[1])
+                send_whatsapp_message(reminder[1], client, my_whatsapp_number)
                 conn.execute("DELETE FROM reminders WHERE id = ?", (reminder[0],))
             
             conn.commit()
 
         time.sleep(60)
-
-if __name__ == "__main__":
-    reminder_bot()
